@@ -4,7 +4,7 @@ This is a framebuffer on-screen keyboard proof-of-concept for TTY, specifically 
 
  - No extra libraries. Great for using at boot time:
 ```
-# ldd osk_mouse
+# ldd osk_touch
 	linux-vdso.so.1 (0x00007ffc49159000)
 	libc.so.6 => /usr/lib/libc.so.6 (0x00007fa930b43000)
 	/lib64/ld-linux-x86-64.so.2 => /usr/lib64/ld-linux-x86-64.so.2 (0x00007fa930d39000)
