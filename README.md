@@ -15,9 +15,7 @@ This is a framebuffer on-screen keyboard proof-of-concept for TTY, specifically 
 ### How to use
 
 - Be sure that `/dev/input/event5` is your real touchscreen. You need it to touch the onscreen keyboard.
-
 - Check which is your framebuffer device (`/dev/fb0`, `/dev/fb1`, etc).
-
 - You need `root` for commands marked with `#`.
 
 ```
