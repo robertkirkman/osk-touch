@@ -8,6 +8,7 @@
  * and www.cubieforums.com/index.php?topic=33.0
  * and fb_drawimage() from https://svn.mcs.anl.gov/repos/ZeptoOS/trunk/BGP/packages/busybox/src/miscutils/fbsplash.c
  * and evtest from https://cgit.freedesktop.org/evtest/tree/evtest.c
+ * and fbkeyboard from https://github.com/julianwi/fbkeyboard/blob/master/fbkeyboard.c
  *
  *   osk_touch.c is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -42,10 +43,11 @@
 
 typedef struct
 {
-	char key;
+	unsigned short key;
 	unsigned int y1, x1, y2, x2;
 } Key;
 
+/* TODO: add escape */
 Key keyboard[TOTAL_KEYS] = {
 	{KEY_GRAVE, 5, 285, 46, 350},
 	{KEY_1, 51, 285, 135, 350},
@@ -110,7 +112,7 @@ Key keyboard[TOTAL_KEYS] = {
 /*
  *	Draw image from PPM file
  */
-/* TODO: fix segfault at 1233rd row, swap texture for capslock/shift/ctrl */
+/* TODO: fix segfault at 1233rd row */
 static void fb_drawimage(const char *filename, char *fbp, int xo, int yo, int bpp, int length, int xres, unsigned *img_height, unsigned *img_width)
 {
 
@@ -183,25 +185,24 @@ static void fb_drawimage(const char *filename, char *fbp, int xo, int yo, int bp
 	fclose(theme_file);
 }
 
-int send_event(int fd, __u16 type, __u16 code, __s32 value)
+void send_key(int fd, unsigned short code)
 {
-	struct input_event event;
-
-	memset(&event, 0, sizeof(event));
-	event.type = type;
-	event.code = code;
-	event.value = value;
-
-	if (write(fd, &event, sizeof(event)) != sizeof(event))
-	{
-		fprintf(stderr, "Error on send_event");
-		return -1;
-	}
-
-	return 0;
+	struct input_event ev;
+	ev.type = EV_KEY;
+	ev.code = code;
+	ev.value = 1;
+	if (write(fd, &ev, sizeof(ev)) != sizeof(ev))
+		fprintf(stderr, "error: sending uinput event\n");
+	ev.value = 0;
+	if (write(fd, &ev, sizeof(ev)) != sizeof(ev))
+		fprintf(stderr, "error: sending uinput event\n");
+	ev.type = EV_SYN;
+	ev.code = SYN_REPORT;
+	if (write(fd, &ev, sizeof(ev)) != sizeof(ev))
+		fprintf(stderr, "error: sending uinput event\n");
 }
 
-char getkey(unsigned int abs_x, unsigned int abs_y)
+unsigned short get_key(unsigned int abs_x, unsigned int abs_y)
 {
 	for (int i = 0; i < TOTAL_KEYS; i++)
 		if (abs_x >= keyboard[i].x1 && abs_x <= keyboard[i].x2 && abs_y >= keyboard[i].y1 && abs_y <= keyboard[i].y2)
@@ -227,7 +228,12 @@ int main(void)
 	memset(&device, 0, sizeof device);
 
 	fd = open(KEYBOARD_FILE, O_WRONLY);
-	strcpy(device.name, "test keyboard");
+	if (fd == -1)
+	{
+		perror("Error: cannot open uinput device\n");
+		exit(1);
+	}
+	strcpy(device.name, "osk-touch");
 
 	device.id.bustype = BUS_USB;
 	device.id.vendor = 1;
@@ -236,13 +242,16 @@ int main(void)
 
 	if (write(fd, &device, sizeof(device)) != sizeof(device))
 	{
-		fprintf(stderr, "error setup\n");
+		fprintf(stderr, "error setting up uinput device\n");
 	}
 
 	if (ioctl(fd, UI_SET_EVBIT, EV_KEY) < 0)
-		fprintf(stderr, "error evbit key\n");
+		fprintf(stderr, "error: SET_EVBIT EV_KEY\n");
 
-	for (i = 0; i < 50; i++)
+	if (ioctl(fd, UI_SET_EVBIT, EV_SYN) < 0)
+		fprintf(stderr, "error: SET_EVBIT EV_SYN\n");
+
+	for (i = 0; i < TOTAL_KEYS; i++)
 		if (ioctl(fd, UI_SET_KEYBIT, keyboard[i].key) < 0)
 			fprintf(stderr, "error evbit key\n");
 
@@ -255,7 +264,7 @@ int main(void)
 
 	if (ioctl(fd, UI_DEV_CREATE) < 0)
 	{
-		fprintf(stderr, "error create\n");
+		fprintf(stderr, "error creating uinput device\n");
 	}
 	/* end uinput init */
 
@@ -265,7 +274,7 @@ int main(void)
 	if (fbfd == -1)
 	{
 		perror("Error: cannot open framebuffer device");
-		exit(1);
+		exit(2);
 	}
 	printf("The framebuffer device was opened successfully.\n");
 
@@ -273,14 +282,14 @@ int main(void)
 	if (ioctl(fbfd, FBIOGET_FSCREENINFO, &finfo) == -1)
 	{
 		perror("Error reading fixed information");
-		exit(2);
+		exit(3);
 	}
 
 	/* Get variable screen information */
 	if (ioctl(fbfd, FBIOGET_VSCREENINFO, &vinfo) == -1)
 	{
 		perror("Error reading variable information");
-		exit(3);
+		exit(4);
 	}
 
 	printf("%dx%d, %dbpp, line length %d\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel, finfo.line_length);
@@ -294,78 +303,101 @@ int main(void)
 	if (fbp == MAP_FAILED)
 	{
 		perror("Error: failed to map framebuffer device to memory");
-		exit(4);
+		exit(5);
 	}
 	printf("The framebuffer device was mapped to memory successfully.\n");
 	/* end init framebuffer */
 
 	/* init touchscreen */
 	int fdm;
-	struct input_event ev[64];
+	struct input_event ev;
 	if ((fdm = open(TOUCHSCREEN_FILE, O_RDONLY | O_NONBLOCK)) == -1)
 	{
 		printf("Device open ERROR\n");
-		exit(5);
+		exit(6);
 	}
 	fd_set rdfs;
 	FD_ZERO(&rdfs);
 	FD_SET(fdm, &rdfs);
 	/* end init touchscreen */
 
-	int ret = 0;
-	unsigned int abs_x = 0, abs_y = 0;
-	char pressed = 0;
-	char pressedkey = 0;
+	int pressed = 0, released = 0, abs_x = 0, abs_y = 0, shift = 0, caps = 0, ctrl = 0;
+	unsigned short pressedkey = 0;
 
 	/* TODO: exit condition */
 	while (1)
 	{
 		/* draw keyboard texture */
+		/* TODO: swap texture for capslock/shift/ctrl */
 		fb_drawimage("deck_keyboard.ppm", fbp, vinfo.xoffset, vinfo.yoffset, vinfo.bits_per_pixel, finfo.line_length, vinfo.xres, &img_height, &img_width);
 
-		/* read up to 64 input events from touchscreen */
+		/* read and parse input events from touchscreen for coordinates and touch state */
+		/* TODO: multitouch, n-key rollover (?) */
 		select(fdm + 1, &rdfs, NULL, NULL, NULL);
-		ret = read(fdm, ev, sizeof(ev));
-		if (ret < (int)sizeof(struct input_event))
+		released = 0;
+		while (read(fdm, &ev, sizeof(struct input_event)) && !(ev.type == EV_SYN && ev.code == SYN_REPORT))
 		{
-			printf("expected %d bytes, got %d\n", (int)sizeof(struct input_event), ret);
-			exit(6);
-		}
-
-		/* parse input events for coordinates and touch state */
-		/* TODO: multitouch, n-key rollover + proper Ctrl/Shift */
-		for (int i = 0; i < ret / sizeof(struct input_event); i++)
-		{
-			unsigned int type, code;
-
-			type = ev[i].type;
-			code = ev[i].code;
-			if (type != EV_SYN && (type != EV_MSC || (code != MSC_RAW && code != MSC_SCAN)))
+			if (ev.type == EV_ABS)
 			{
-				if (code == ABS_X)
-					abs_x = ev[i].value;
-				else if (code == ABS_Y)
-					abs_y = ev[i].value;
-				else if (code == BTN_TOUCH)
+				switch (ev.code)
 				{
-					if (ev[i].value)
-						pressed = 1;
-					else
+				case ABS_MT_POSITION_X:
+					abs_x = ev.value;
+					pressed = 1;
+					break;
+				case ABS_MT_POSITION_Y:
+					abs_y = ev.value;
+					pressed = 1;
+					break;
+				case ABS_MT_TRACKING_ID:
+					if (ev.value == -1)
+					{
 						pressed = 0;
+						released = 1;
+					}
+					break;
 				}
+			}
+			else if (ev.type == EV_SYN && ev.code == SYN_MT_REPORT)
+			{
+				pressed = 0;
+				released = 1;
 			}
 		}
 
-		/* cross reference state with table, then push corresponding keys */
-		/* TODO: why don't space, period, slash or arrow keys work? */
-		if (pressed)
+		/* push corresponding keys */
+		if (released && pressedkey)
 		{
-			pressedkey = getkey(abs_x, abs_y);
-			send_event(fd, EV_KEY, pressedkey, 1);
+			if (pressedkey == KEY_LEFTSHIFT || pressedkey == KEY_RIGHTSHIFT)
+			{
+				shift ^= 1;
+				ev.type = EV_KEY;
+				ev.code = KEY_LEFTSHIFT;
+				ev.value = shift;
+				if (write(fd, &ev, sizeof(ev)) != sizeof(ev))
+					fprintf(stderr, "error sending uinput event\n");
+			}
+			else if (pressedkey == KEY_LEFTCTRL)
+			{
+				ctrl ^= 1;
+				ev.type = EV_KEY;
+				ev.code = KEY_LEFTCTRL;
+				ev.value = ctrl;
+				if (write(fd, &ev, sizeof(ev)) != sizeof(ev))
+					fprintf(stderr, "error sending uinput event\n");
+			}
+			else
+			{
+				if (pressedkey == KEY_CAPSLOCK)
+					caps ^= 1;
+				send_key(fd, pressedkey);
+			}
 		}
-		else
-			send_event(fd, EV_KEY, pressedkey, 0);
-		send_event(fd, EV_SYN, SYN_REPORT, 0);
+
+		/* cross-reference state with table */
+		pressedkey = 0;
+		if (pressed)
+			pressedkey = get_key(abs_x, abs_y);
 	}
 
 	close(fd);
