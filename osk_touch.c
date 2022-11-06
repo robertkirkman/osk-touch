@@ -38,6 +38,7 @@
 #define FRAMEBUFFER_FILE "/dev/fb0"
 #define KEYBOARD_FILE "/dev/uinput"
 #define TOUCHSCREEN_FILE "/dev/input/event5"
+#define BITMAP_FILE "deck_keyboard.ppm"
 
 #define TOTAL_KEYS 59
 
@@ -112,7 +113,6 @@ Key keyboard[TOTAL_KEYS] = {
 /*
  *	Draw image from PPM file
  */
-/* TODO: fix segfault at 1233rd row */
 static void fb_drawimage(const char *filename, char *fbp, int xo, int yo, int bpp, int length, int xres, unsigned *img_height, unsigned *img_width)
 {
 
@@ -295,11 +295,13 @@ int main(void)
 	printf("%dx%d, %dbpp, line length %d\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel, finfo.line_length);
 
 	/* Figure out the size of the screen in bytes */
-	screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8;
+	/* TODO: why do I have to add 151553 bytes to this to avoid segfault??? */
+	screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8 + 151553;
+	printf("screensize: %d\n", screensize);
 
 	/* Map the device to memory */
 	fbp = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED,
-					   fbfd, 0);
+					   fbfd, (off_t)0);
 	if (fbp == MAP_FAILED)
 	{
 		perror("Error: failed to map framebuffer device to memory");
@@ -328,8 +330,8 @@ int main(void)
 	while (1)
 	{
 		/* draw keyboard texture */
-		/* TODO: swap texture for capslock/shift/ctrl */
-		fb_drawimage("deck_keyboard.ppm", fbp, vinfo.xoffset, vinfo.yoffset, vinfo.bits_per_pixel, finfo.line_length, vinfo.xres, &img_height, &img_width);
+		/* TODO: swap texture for capslock/shift/ctrl, and maybe overlay texture for any key pressed? */
+		fb_drawimage(BITMAP_FILE, fbp, vinfo.xoffset, vinfo.yoffset, vinfo.bits_per_pixel, finfo.line_length, vinfo.xres, &img_height, &img_width);
 
 		/* read and parse input events from touchscreen for coordinates and touch state */
 		/* TODO: multitouch, n-key rollover (?) */
