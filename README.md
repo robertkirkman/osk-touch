@@ -26,4 +26,4 @@ $ make
 # ./osk_touch &
 ```
 
-The deck_keyboard.ppm is the keyboard image. **It is a screenshot of Valve's keyboard edited with GIMP and exported as raw ppm.**
+The `deck_keyboard.ppm` is the keyboard image. **It is a screenshot of Valve's keyboard edited with GIMP and exported as raw ppm.**
