@@ -1,6 +1,6 @@
 # osk-touch
 
-This is a framebuffer on-screen keyboard proof-of-concept for TTY, specifically intended for Steam Deck. If configured precisely, it might be useful for accessibility. Currently, you can touch the screen to send the keystrokes to the system, like a real keyboard.
+This is a framebuffer onscreen keyboard for TTY, specifically intended for Steam Deck. It might be useful for accessibility. You can touch the screen to send the keystrokes to the system, like a real keyboard.
 
  - No extra libraries. Great for using at boot time:
 ```
