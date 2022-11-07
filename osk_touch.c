@@ -276,7 +276,6 @@ int main(void)
 		perror("Error: cannot open framebuffer device");
 		exit(2);
 	}
-	printf("The framebuffer device was opened successfully.\n");
 
 	/* Get fixed screen information */
 	if (ioctl(fbfd, FBIOGET_FSCREENINFO, &finfo) == -1)
@@ -292,22 +291,14 @@ int main(void)
 		exit(4);
 	}
 
-	printf("%dx%d, %dbpp, line length %d\n", vinfo.xres, vinfo.yres, vinfo.bits_per_pixel, finfo.line_length);
-
-	/* Figure out the size of the screen in bytes */
-	/* TODO: why do I have to add 151553 bytes to this to avoid segfault??? */
-	screensize = vinfo.xres * vinfo.yres * vinfo.bits_per_pixel / 8 + 151553;
-	printf("screensize: %d\n", screensize);
-
 	/* Map the device to memory */
-	fbp = (char *)mmap(0, screensize, PROT_READ | PROT_WRITE, MAP_SHARED,
+	fbp = (char *)mmap(0, finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED,
 					   fbfd, (off_t)0);
 	if (fbp == MAP_FAILED)
 	{
 		perror("Error: failed to map framebuffer device to memory");
 		exit(5);
 	}
-	printf("The framebuffer device was mapped to memory successfully.\n");
 	/* end init framebuffer */
 
 	/* init touchscreen */
