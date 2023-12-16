@@ -28,7 +28,7 @@ $ make
 # ./osk_touch &
 ```
 
-### How to disable automatic login, drop to `tty4` on boot, and automatically launch `osk-touch`
+### How to disable automatic login, drop to `tty4` on boot, and launch `osk-touch`
 > Example focuses on SteamOS. Directions must be adapted where necessary for other distros.
 
 - After compilation, install `osk-touch` to the writable, persistent `/home/` folder:
