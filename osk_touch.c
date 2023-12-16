@@ -20,11 +20,14 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define _GNU_SOURCE // I guess we are glibc for now
+
 #include <fcntl.h>
 #include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/ioctl.h>
 #include <linux/uinput.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +40,9 @@
 
 #define FRAMEBUFFER_FILE "/dev/fb0"
 #define KEYBOARD_FILE "/dev/uinput"
-#define TOUCHSCREEN_FILE "/dev/input/event5"
+#define DEV_INPUT_EVENT "/dev/input"
+#define EVENT_DEV_NAME "event"
+#define TOUCHSCREEN_NAME "FTS3528:00 2808:1015"
 #define BITMAP_FILE "deck_keyboard.ppm"
 
 #define TOTAL_KEYS 59
@@ -210,6 +215,69 @@ unsigned short get_key(unsigned int abs_x, unsigned int abs_y)
 	return 0;
 }
 
+/* Detect the Steam Deck's touchscreen device. Code copied from evtest. */
+
+/**
+ * Filter for the AutoDevProbe scandir on /dev/input.
+ *
+ * @param dir The current directory entry provided by scandir.
+ *
+ * @return Non-zero if the given directory entry starts with "event", or zero
+ * otherwise.
+ */
+static int is_event_device(const struct dirent *dir) {
+	return strncmp(EVENT_DEV_NAME, dir->d_name, 5) == 0;
+}
+
+/**
+ * Scans all /dev/input/event* and automatically returns the one matching
+ * "FTS3528:00 2808:1015", the Steam Deck's touchscreen, or /dev/input/event0
+ * if it was not found.
+ *
+ * @return The event device file name of the device file selected. This
+ * string is allocated and must be freed by the caller.
+ */
+static char* scan_devices(void)
+{
+	struct dirent **namelist;
+	int ndev, devnum = 0, found = 0;
+	char *device_path;
+
+	ndev = scandir(DEV_INPUT_EVENT, &namelist, is_event_device, versionsort);
+
+	for (int i = 0; i < ndev && ndev > 0; i++)
+	{
+		if (found) break;
+		char fname[64];
+		int fd = -1;
+		char name[256] = "???";
+
+		snprintf(fname, sizeof(fname),
+			 "%s/%s", DEV_INPUT_EVENT, namelist[i]->d_name);
+		fd = open(fname, O_RDONLY);
+		if (fd < 0)
+			continue;
+		ioctl(fd, EVIOCGNAME(sizeof(name)), name);
+		close(fd);
+
+		if (!strcmp(name, TOUCHSCREEN_NAME))
+		{
+			found = 1;
+		}
+
+		sscanf(namelist[i]->d_name, "event%d", &devnum);
+
+		free(namelist[i]);
+	}
+
+	// I think this is a small memory leak but it's in evtest to begin with
+	asprintf(&device_path, "%s/%s%d",
+		 DEV_INPUT_EVENT, EVENT_DEV_NAME,
+		 devnum);
+
+	return device_path;
+}
+
 int main(void)
 {
 
@@ -304,7 +372,7 @@ int main(void)
 	/* init touchscreen */
 	int fdm;
 	struct input_event ev;
-	if ((fdm = open(TOUCHSCREEN_FILE, O_RDONLY | O_NONBLOCK)) == -1)
+	if ((fdm = open(scan_devices(), O_RDONLY | O_NONBLOCK)) == -1)
 	{
 		printf("Device open ERROR\n");
 		exit(6);
