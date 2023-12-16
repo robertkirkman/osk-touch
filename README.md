@@ -12,10 +12,12 @@ This is a framebuffer onscreen keyboard for TTY, specifically intended for Steam
  - Onscreen keyboard using framebuffer
  - It reads touchscreen and sends keystrokes using uinput
 
+The `deck_keyboard.ppm` is the keyboard image. **It is a screenshot of Valve's keyboard edited with GIMP and exported as raw ppm.**
+
 ### How to use
 
-- Be sure that `/dev/input/event5` is your real touchscreen. You need it to touch the onscreen keyboard.
-- Check which is your framebuffer device (`/dev/fb0`, `/dev/fb1`, etc).
+- Be sure that "`FTS3528:00 2808:1015`" is the name of your touchscreen. That is the name of the Steam Deck LCD's touchscreen and is used by default. DeckHD and Steam Deck OLED support might come to this project eventually.
+- Check which is your framebuffer device (`/dev/fb0`, `/dev/fb1`, etc). `/dev/fb0`, the Steam Deck's, is used by default.
 - You need `root` for commands marked with `#`.
 - To execute `osk_touch` as `deck` user, you can use `# usermod -aG input,video deck` first, then log out and log in.
 
@@ -26,4 +28,45 @@ $ make
 # ./osk_touch &
 ```
 
-The `deck_keyboard.ppm` is the keyboard image. **It is a screenshot of Valve's keyboard edited with GIMP and exported as raw ppm.**
+### How to disable automatic login, drop to `tty4` on boot, and automatically launch `osk-touch`
+> Example focuses on SteamOS. Directions must be adapted where necessary for other distros.
+
+- After compilation, install `osk-touch` to the writable, persistent `/home/` folder:
+```
+# cp osk_touch /home/
+# cp deck_keyboard.ppm /home/
+```
+
+- Create a script in `/home/` named `osk-touch.sh` with this content:
+```bash
+#!/bin/bash
+chvt 4
+/home/osk_touch
+```
+
+- Mark the script executable:
+```
+# chmod +x /home/osk-touch.sh
+```
+
+- Create a service in `/etc/systemd/system/` named `osk-touch.service`:
+```
+[Unit]
+Description=Touchscreen keyboard for Steam Deck TTY
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+WorkingDirectory=/home
+ExecStart=/home/osk-touch.sh
+
+[Install]
+WantedBy=multi-user.target
+```
+
+- Disable automatic starting of SDDM, which will disable automatic login, and enable `osk-touch.service`:
+```
+# systemctl disable sddm
+# systemctl enable osk-touch
+```
