@@ -237,7 +237,7 @@ static int is_event_device(const struct dirent *dir) {
  * @return The event device file name of the device file selected. This
  * string is allocated and must be freed by the caller.
  */
-static char* scan_devices(void)
+static char* find_touchscreen(void)
 {
 	struct dirent **namelist;
 	int ndev, devnum = 0, found = 0;
@@ -270,7 +270,6 @@ static char* scan_devices(void)
 		free(namelist[i]);
 	}
 
-	// I think this is a small memory leak but it's in evtest to begin with
 	asprintf(&device_path, "%s/%s%d",
 		 DEV_INPUT_EVENT, EVENT_DEV_NAME,
 		 devnum);
@@ -372,11 +371,13 @@ int main(void)
 	/* init touchscreen */
 	int fdm;
 	struct input_event ev;
-	if ((fdm = open(scan_devices(), O_RDONLY | O_NONBLOCK)) == -1)
+	char *touchscreen_filename = find_touchscreen();
+	if ((fdm = open(touchscreen_filename, O_RDONLY | O_NONBLOCK)) == -1)
 	{
 		printf("Device open ERROR\n");
 		exit(6);
 	}
+	free(touchscreen_filename);
 	fd_set rdfs;
 	FD_ZERO(&rdfs);
 	FD_SET(fdm, &rdfs);
