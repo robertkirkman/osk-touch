@@ -20,7 +20,6 @@ The `deck_keyboard.ppm` is the keyboard image. **It is a screenshot of Valve's k
 - Be sure that "`FTS3528:00 2808:1015`" is the name of your touchscreen. That is the name of the Steam Deck LCD's touchscreen and is used by default. DeckHD and Steam Deck OLED support might come to this project eventually.
 - Check which is your framebuffer device (`/dev/fb0`, `/dev/fb1`, etc). `/dev/fb0`, the Steam Deck's, is used by default.
 - You need `root` for commands marked with `#`.
-- To execute `osk_touch` as `deck` user, you can use `# usermod -aG input,video deck` first, then log out and log in.
 - If you experience crashing after updating your OS, you need to update your toolchain too and recompile this app.
 
 ```
