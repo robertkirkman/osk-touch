@@ -17,8 +17,8 @@ The `deck_keyboard.ppm` is the keyboard image. **It is a screenshot of Valve's k
 ### How to use
 
 - If you are using SteamOS, you need my [SteamOS on-device native unsandboxed toolchain guide](https://gist.github.com/robertkirkman/753922262259486ec417e5ff8b5b924b#prerequisites-for-all-methods-shown-here) or any equivalent C toolchain you prefer that you can get to work with this app.
-- Be sure that "`FTS3528:00 2808:1015`" is the name of your touchscreen. That is the name of the Steam Deck LCD's touchscreen and is used by default. DeckHD and Steam Deck OLED support might come to this project eventually.
-- Check which is your framebuffer device (`/dev/fb0`, `/dev/fb1`, etc). `/dev/fb0`, the Steam Deck's, is used by default.
+- Be sure that "`FTS3528:00 2808:1015`" is the name of your touchscreen. That is the name of the Steam Deck's touchscreen and is used by default.
+- Check which is your framebuffer device (`/dev/fb0`, `/dev/graphics/fb0`, etc). `/dev/fb0`, that of SteamOS, is used by default.
 - You need `root` for commands marked with `#`.
 - If you experience crashing after updating your OS, you need to update your toolchain too and recompile this app.
 

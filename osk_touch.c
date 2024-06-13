@@ -20,7 +20,9 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define _GNU_SOURCE // I guess we are glibc for now
+#ifndef __BIONIC__
+#define _GNU_SOURCE
+#endif
 
 #include <fcntl.h>
 #include <linux/fb.h>
@@ -38,7 +40,15 @@
 #include <termios.h>
 #include <unistd.h>
 
+#ifdef __BIONIC__
+// Android-x86 typically is more likely to come with features like
+// CONFIG_VT and root, both of which this program depends on,
+// than other families of Android
+// Android-x86 distro tested: BlissOS Zenith 16.9.4
+#define FRAMEBUFFER_FILE "/dev/graphics/fb0"
+#else
 #define FRAMEBUFFER_FILE "/dev/fb0"
+#endif
 #define KEYBOARD_FILE "/dev/uinput"
 #define DEV_INPUT_EVENT "/dev/input"
 #define EVENT_DEV_NAME "event"
@@ -243,7 +253,11 @@ static char* find_touchscreen(void)
 	int ndev, devnum = 0, found = 0;
 	char *device_path;
 
+#ifdef __BIONIC__
+	ndev = scandir(DEV_INPUT_EVENT, &namelist, is_event_device, alphasort);
+#else
 	ndev = scandir(DEV_INPUT_EVENT, &namelist, is_event_device, versionsort);
+#endif
 
 	for (int i = 0; i < ndev && ndev > 0; i++)
 	{
